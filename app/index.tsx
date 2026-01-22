@@ -9,7 +9,7 @@ const WelcomeScreen = () => {
 
   const handleLogin = () => {
     // Navigate to the login page (create app/login.tsx later)
-   // router.push('/login'); 
+    router.push('/(auth)/login'); 
   };
 
   const handleSignUp = () => {
