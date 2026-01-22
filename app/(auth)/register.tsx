@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StatusBar, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons'; 
-// Import global CSS (Up 2 levels)
+
+// 1. Firebase Imports
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../../service/firebaseConfig'; // Check this path matches your folder structure
+
+// Import global CSS
 import "../../global.css";
 
 export default function RegisterScreen() {
@@ -13,6 +19,53 @@ export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false); // To show spinner while saving
+
+  // 2. The Registration Logic
+  const handleRegister = async () => {
+    // A. Basic Validation
+    if (!email || !password || !name) {
+      Alert.alert("Error", "Please fill in all fields.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // B. Create User in Firebase Authentication (Email/Pass)
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // C. Save User Details (Name, Role) to Firestore Database
+      // We use the 'uid' from Auth as the document ID in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: name,
+        email: email,
+        role: role, // Critical: This saves 'customer' or 'provider'
+        createdAt: new Date().toISOString(),
+      });
+
+      // D. Success! Navigate to the correct home screen
+      Alert.alert("Success", "Account created successfully!");
+      
+      if (role === 'provider') {
+        router.replace('/(provider)/(tabs)/dashboard'); 
+      } else {
+        router.replace('/(customer)/(tabs)'); 
+      }
+
+    } catch (error: any) {
+      // Handle Errors (e.g., Email already in use)
+      let errorMessage = error.message;
+      if (errorMessage.includes("email-already-in-use")) {
+        errorMessage = "This email is already registered.";
+      }
+      Alert.alert("Registration Failed", errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-[#000000]">
@@ -30,7 +83,7 @@ export default function RegisterScreen() {
 
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6 pb-10">
         
-        {/* 1. Title Section */}
+        {/* Title Section */}
         <View className="mb-8">
           <Text className="text-white text-4xl font-extrabold tracking-tight">
             Create Account
@@ -40,9 +93,8 @@ export default function RegisterScreen() {
           </Text>
         </View>
 
-        {/* 2. Role Selector (Critical for your app) */}
+        {/* Role Selector */}
         <View className="flex-row bg-[#1A1A1A] p-1 rounded-2xl mb-8 border border-[#333]">
-          {/* Customer Tab */}
           <TouchableOpacity 
             onPress={() => setRole('customer')}
             className={`flex-1 py-3 rounded-xl justify-center items-center ${role === 'customer' ? 'bg-[#C2E803]' : 'bg-transparent'}`}
@@ -52,7 +104,6 @@ export default function RegisterScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Provider Tab */}
           <TouchableOpacity 
             onPress={() => setRole('provider')}
             className={`flex-1 py-3 rounded-xl justify-center items-center ${role === 'provider' ? 'bg-[#C2E803]' : 'bg-transparent'}`}
@@ -63,7 +114,7 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 3. Form Fields */}
+        {/* Form Fields */}
         <View className="space-y-5">
             {/* Full Name */}
             <View>
@@ -105,17 +156,23 @@ export default function RegisterScreen() {
             </View>
         </View>
 
-        {/* 4. Dynamic Action Button */}
+        {/* Submit Button */}
         <TouchableOpacity 
+          onPress={handleRegister} // <--- Connected here
+          disabled={loading} // Prevent double clicks
           activeOpacity={0.8}
           className="bg-[#C2E803] py-4 rounded-xl items-center shadow-lg shadow-lime-900/20 mt-10 mb-6"
         >
-          <Text className="text-black font-bold text-lg uppercase tracking-wider">
-            {role === 'customer' ? 'Join as Homeowner' : 'Join as Pro'}
-          </Text>
+          {loading ? (
+             <ActivityIndicator color="black" />
+          ) : (
+             <Text className="text-black font-bold text-lg uppercase tracking-wider">
+               {role === 'customer' ? 'Join as Homeowner' : 'Join as Pro'}
+             </Text>
+          )}
         </TouchableOpacity>
 
-        {/* 5. Footer */}
+        {/* Footer */}
         <View className="flex-row justify-center">
             <Text className="text-neutral-400">Already have an account? </Text>
             <TouchableOpacity onPress={() => router.push('/login')}>
