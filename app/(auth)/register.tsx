@@ -4,11 +4,12 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons'; 
 
 // 1. Firebase Imports
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../../service/firebaseConfig'; // Check this path matches your folder structure
+// Note: Ensure this path matches your folder name 'service' or 'services'
+import { auth, db } from '../../service/firebaseConfig'; 
 
-// Import global CSS
+// 2. CSS Import (Up 2 levels)
 import "../../global.css";
 
 export default function RegisterScreen() {
@@ -19,9 +20,8 @@ export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false); // To show spinner while saving
+  const [loading, setLoading] = useState(false); 
 
-  // 2. The Registration Logic
   const handleRegister = async () => {
     // A. Basic Validation
     if (!email || !password || !name) {
@@ -32,31 +32,37 @@ export default function RegisterScreen() {
     setLoading(true);
 
     try {
-      // B. Create User in Firebase Authentication (Email/Pass)
+      // B.1 Create User in Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // C. Save User Details (Name, Role) to Firestore Database
-      // We use the 'uid' from Auth as the document ID in Firestore
+      // B.2 UPDATE AUTH PROFILE
+      // This saves the name to the Auth tab in Firebase Console
+      await updateProfile(user, {
+        displayName: name
+      });
+
+      // C. Save User Details to Firestore Database
+      // This saves the detailed data (Role, Date, etc.)
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         name: name,
         email: email,
-        role: role, // Critical: This saves 'customer' or 'provider'
+        role: role, 
         createdAt: new Date().toISOString(),
       });
 
-      // D. Success! Navigate to the correct home screen
       Alert.alert("Success", "Account created successfully!");
       
+      // D. Navigation (FIXED PATHS)
+      // Expo Router ignores (folders), so we link directly to the file names
       if (role === 'provider') {
-        router.replace('/(provider)/(tabs)/dashboard'); 
+        router.replace('/(provider)/main'); 
       } else {
-        router.replace('/(customer)/(tabs)'); 
+        router.replace('/main'); 
       }
 
     } catch (error: any) {
-      // Handle Errors (e.g., Email already in use)
       let errorMessage = error.message;
       if (errorMessage.includes("email-already-in-use")) {
         errorMessage = "This email is already registered.";
@@ -158,8 +164,8 @@ export default function RegisterScreen() {
 
         {/* Submit Button */}
         <TouchableOpacity 
-          onPress={handleRegister} // <--- Connected here
-          disabled={loading} // Prevent double clicks
+          onPress={handleRegister}
+          disabled={loading}
           activeOpacity={0.8}
           className="bg-[#C2E803] py-4 rounded-xl items-center shadow-lg shadow-lime-900/20 mt-10 mb-6"
         >

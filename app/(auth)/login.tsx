@@ -1,36 +1,83 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StatusBar, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-// Import your global CSS
-import "../../global.css";
-// Using Ionicons for the Google Icon (standard in Expo)
 import { Ionicons } from '@expo/vector-icons'; 
+
+// 1. Firebase Imports
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+// Make sure this path matches your folder name ('service' vs 'services')
+import { auth, db } from '../../service/firebaseConfig';
+
+// 2. CSS Import
+import "../../global.css";
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSignIn = () => {
-    console.log("Sign In Pressed with:", email, password);
-    // Future: Add Firebase Login Logic here
+  // 3. Login Logic
+  const handleSignIn = async () => {
+    // A. Validation
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter both email and password.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // B. Authenticate with Firebase Auth
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // C. Fetch User Role from Firestore Database
+      // We need to know if they are a 'customer' or 'provider'
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const role = userData.role;
+
+        // D. Route based on Role
+        if (role === 'provider') {
+           // Go to Provider Dashboard
+           router.replace('/(provider)/main');
+        } else {
+           // Go to Customer Home
+           router.replace('/main');
+        }
+      } else {
+        Alert.alert("Error", "User data not found in database.");
+      }
+
+    } catch (error: any) {
+      // Handle Firebase Errors
+      let msg = error.message;
+      if (msg.includes("invalid-credential")) msg = "Invalid email or password.";
+      Alert.alert("Login Failed", msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleLogin = () => {
     console.log("Google Login Pressed");
-    // Future: Add Google Auth Logic here
+    // Google Auth requires extra setup (expo-auth-session), keeping this as placeholder for now
+    Alert.alert("Coming Soon", "Google Login is not yet configured.");
   };
 
   return (
     <View className="flex-1 bg-[#000000]">
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
-      {/* ScrollView ensures the screen is scrollable on small devices when keyboard opens */}
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }} className="px-6">
         
-        {/* 1. Header Section */}
+        {/* Header Section */}
         <View className="mb-10 mt-6">
-            {/* Logo Icon */}
             <View className="w-12 h-12 rounded-full border border-[#C2E803] justify-center items-center mb-6">
                <Text className="text-[#C2E803] text-xl font-bold">F</Text>
             </View>
@@ -44,9 +91,8 @@ export default function LoginScreen() {
             </Text>
         </View>
 
-        {/* 2. Form Section */}
+        {/* Form Section */}
         <View className="space-y-6">
-            {/* Email Input */}
             <View>
                 <Text className="text-neutral-400 mb-2 ml-1 text-sm font-medium">Email Address</Text>
                 <TextInput 
@@ -60,7 +106,6 @@ export default function LoginScreen() {
                 />
             </View>
 
-            {/* Password Input */}
             <View>
                 <Text className="text-neutral-400 mb-2 ml-1 text-sm font-medium">Password</Text>
                 <TextInput 
@@ -71,34 +116,35 @@ export default function LoginScreen() {
                     onChangeText={setPassword}
                     secureTextEntry
                 />
-                {/* Forgot Password Link */}
                 <TouchableOpacity className="self-end mt-2">
                     <Text className="text-neutral-500 text-sm">Forgot Password?</Text>
                 </TouchableOpacity>
             </View>
         </View>
 
-        {/* 3. Action Buttons */}
+        {/* Action Buttons */}
         <View className="mt-8">
-            {/* Primary Login Button */}
             <TouchableOpacity 
                 onPress={handleSignIn}
+                disabled={loading}
                 activeOpacity={0.8}
                 className="bg-[#C2E803] py-4 rounded-xl items-center shadow-lg shadow-lime-900/20 mb-4"
             >
-                <Text className="text-black font-bold text-lg uppercase tracking-wider">
-                    Sign In
-                </Text>
+                {loading ? (
+                    <ActivityIndicator color="black" />
+                ) : (
+                    <Text className="text-black font-bold text-lg uppercase tracking-wider">
+                        Sign In
+                    </Text>
+                )}
             </TouchableOpacity>
 
-            {/* Divider */}
             <View className="flex-row items-center my-6">
                 <View className="flex-1 h-[1px] bg-[#333]" />
                 <Text className="text-neutral-500 mx-4 text-sm">Or continue with</Text>
                 <View className="flex-1 h-[1px] bg-[#333]" />
             </View>
 
-            {/* Google Login Button */}
             <TouchableOpacity 
                 onPress={handleGoogleLogin}
                 activeOpacity={0.8}
@@ -109,10 +155,10 @@ export default function LoginScreen() {
             </TouchableOpacity>
         </View>
 
-        {/* 4. Footer */}
+        {/* Footer */}
         <View className="flex-row justify-center mt-10 mb-6">
             <Text className="text-neutral-400">Don't have an account? </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+            <TouchableOpacity onPress={() => router.push('/register')}>
                 <Text className="text-[#C2E803] font-bold">Register</Text>
             </TouchableOpacity>
         </View>
